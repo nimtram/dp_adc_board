@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include "sd_card.h"
 #include "fmc_sdram.h"
+#include "spi_adc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,21 +36,10 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
-#define SPI1_CS_PIN GPIOG
-#define SPI1_CS_PIN_NUMBER GPIO_PIN_10
-
-#define SPI1_RDY_PIN GPIOA
-#define SPI1_RDY_PIN_NUMBER GPIO_PIN_6
-
-
-#define SPI2_CS_PIN GPIOB
-#define SPI2_CS_PIN_NUMBER GPIO_PIN_12
-
-#define SPI2_RDY_PIN GPIOB
-#define SPI2_RDY_PIN_NUMBER GPIO_PIN_14
-
-#define SDRAM_ADD 0xD0000000
+#define SDRAM_ADD 0xC0000000
+#define SDRAM_ADD_INCREMENT 0x3000000
+#define ARRAY_SIZE 12582912
+#define SPI_VALUES_TO_CONVERT 15
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -64,6 +54,10 @@ SD_HandleTypeDef hsd1;
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 SPI_HandleTypeDef hspi4;
+DMA_HandleTypeDef hdma_spi1_rx;
+DMA_HandleTypeDef hdma_spi1_tx;
+DMA_HandleTypeDef hdma_spi2_rx;
+DMA_HandleTypeDef hdma_spi2_tx;
 DMA_HandleTypeDef hdma_spi4_rx;
 
 TIM_HandleTypeDef htim1;
@@ -71,10 +65,6 @@ TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart5;
-DMA_HandleTypeDef hdma_uart4_rx;
-DMA_HandleTypeDef hdma_uart4_tx;
-DMA_HandleTypeDef hdma_uart5_rx;
-DMA_HandleTypeDef hdma_uart5_tx;
 
 SDRAM_HandleTypeDef hsdram1;
 
@@ -82,12 +72,50 @@ SDRAM_HandleTypeDef hsdram1;
 FMC_SDRAM_CommandTypeDef fmc_command;
 uint8_t data[1];
 uint8_t data2[3];
-
-uint8_t adc_values[80];
-
-uint32_t readIndex=0;
+uint32_t counterSPI1_EXTI = 0;
+uint32_t counterSPI2_EXTI = 0;
 
 bool interruptActive = false;
+
+bool flagReset_spi1 = false;
+bool flagReset_spi2 = false;
+bool flagReset_spi3 = false;
+bool sendToSDcard = false;
+bool sd_card_write_values_enable = false;
+HAL_StatusTypeDef spiStatus[40];
+uint8_t pTxData[] = {0x00, 0x00, 0x00, 0x00};
+uint8_t adcRawVaues[800]; // 40 x 32bit values
+uint32_t tmp_uartCounter = 0;
+
+//uint8_t spi1Buffer[100000] __attribute__ ((at(SDRAM_ADD)));
+//uint8_t spi2Buffer[100000] __attribute__ ((at(SDRAM_ADD + SDRAM_ADD_INCREMENT)));
+//uint8_t spi3Buffer[100000] __attribute__ ((at(SDRAM_ADD+SDRAM_ADD_INCREMENT+SDRAM_ADD_INCREMENT)));
+
+uint8_t spi1Buffer[(SPI_VALUES_TO_CONVERT*4)]; //FIXME
+uint8_t spi2Buffer[(SPI_VALUES_TO_CONVERT*4)];
+//uint8_t spi3Buffer[ARRAY_SIZE];
+//FIXME
+//uint8_t spi1Buffer = (uint8_t *)SDRAM_ADD;
+//uint8_t spi2Buffer = (uint8_t *)(SDRAM_ADD + SDRAM_ADD_INCREMENT);
+
+bool spiReadingOngoing;
+
+unsigned long t1 =0;
+unsigned long t2 =0;
+char fileSpi1Name[] = {'S','P','I','1','.','t','x','t','\0'};
+char fileSpi2Name[] = {'S','P','I','2','.','t','x','t','\0'};
+
+volatile uint8_t rxUart4Buffer[1];
+volatile uint8_t rxUart5Buffer[1];
+volatile uint8_t uartCommand;
+volatile bool uartNewCommand = false;
+
+bool enableSPI1Interrupt = false;
+bool enableSPI2Interrupt = false;
+// TODO: Testing of SDRAM array
+//__attribute__((section(".sdram"))) unsigned char testArray[100];
+uint32_t testArray[1000] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -105,7 +133,7 @@ static void MX_DMA_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_SDMMC1_SD_Init(void);
 /* USER CODE BEGIN PFP */
-
+/*
 void spi1_adc_init(void);
 void spi2_adc_init(void);
 void spi1_read_send_default(void);
@@ -114,7 +142,7 @@ void spi1_read_write_continuous_conversion_mode(void);
 void spi1_compute_and_send_values(void);
 void spi1_read_2k_samples(void);
 void spi1_soft_reset(void);
-void spi1_read_register(void);
+void spi1_read_register(void);*/
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -130,9 +158,6 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   /* USER CODE END 1 */
-
-  /* Enable I-Cache---------------------------------------------------------*/
-  SCB_EnableICache();
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -150,11 +175,12 @@ int main(void)
   PeriphCommonClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+//TODO: need to swapt DMA init everytime!!
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_SPI1_Init();
   MX_TIM1_Init();
   MX_UART4_Init();
@@ -162,50 +188,174 @@ int main(void)
   MX_SPI2_Init();
   MX_SPI4_Init();
   MX_UART5_Init();
-  MX_DMA_Init();
+
   MX_TIM2_Init();
   MX_SDMMC1_SD_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
-  HAL_Delay(2000);
+  //spi1_set_exti();
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  HAL_Delay(500);
 
-  sd_card_init();
-  sd_card_create_file("test2.txt");
-  sd_card_open_file("test2.txt");
 
-  char buffer[10];
-
-  for (uint8_t var = 0; var < 200; ++var) {
-    sprintf(buffer, "%d", var);
-    sd_card_write_to_opened_file("test2.txt", buffer);
-  }
-  sd_card_close_file("test2.txt");
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
     //
 
+  SDRAM_Startup_Sequence(&hsdram1, &fmc_command);
+  sd_card_init();
+  HAL_Delay(1000);
 
-  //spi1_soft_reset();
-  //spi1_adc_init();
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 1, 1);
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 1);
+  HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+  spi1_soft_reset();
+  spi2_soft_reset();
+  spi1_adc_init();
+  spi2_adc_init();
+  t1 = DWT->CYCCNT;
+  __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
+  __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
+  counterSPI1_EXTI = 0;
+  counterSPI2_EXTI = 0;
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
-    // FIXME
-    //sd_card_test_script();
-    SDRAM_Startup_Sequence(&hsdram1, &fmc_command);
-    __NOP();
+  // uart IT enable
+  HAL_UART_Receive_IT (&huart4, rxUart4Buffer, 1);
+  HAL_UART_Receive_IT (&huart5, rxUart4Buffer, 1);
+  // FIXME main
+  //sd_card_test_script();
+
+  //initial setup:
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+
+
     while (1){
 
-     //spi1_read_2k_samples();
-    // spi1_compute_and_send_values();
-     //spi1_read_send_default();
-    // spi1_read_write_continuous_conversion_mode();
-     //spi1_read_register();
+      //HAL_UART_Transmit(&huart4, "x11,20,50,17851", 15, 100);
 
+      if (flagReset_spi1 == true){
+        flagReset_spi1 = false;
+        counterSPI1_EXTI = 0;
+      }
+      else if (flagReset_spi2 == true){
+        flagReset_spi2 = false;
+        counterSPI2_EXTI = 0;
+      }
+
+      if(counterSPI1_EXTI >= SPI_VALUES_TO_CONVERT){
+        //t2 = DWT->CYCCNT;
+        //unsigned long diff = t2 - t1;
+        HAL_UART_Transmit(&huart4, (uint8_t*)"x", 1, 10);
+        spi_it_convert_and_send(spi1Buffer,SPI_VALUES_TO_CONVERT);
+        if (sd_card_write_values_enable == true){
+          sd_card_write_values(fileSpi1Name, (char*)spi1Buffer, SPI_VALUES_TO_CONVERT);
+        }
+        flagReset_spi1 = true;
+      }
+
+      if(counterSPI2_EXTI >= SPI_VALUES_TO_CONVERT){
+        //t2 = DWT->CYCCNT;
+        //unsigned long diff = t2 - t1;
+        HAL_UART_Transmit(&huart4, (uint8_t*)"y", 1, 10);
+        spi_it_convert_and_send(spi2Buffer,SPI_VALUES_TO_CONVERT);
+        if (sd_card_write_values_enable == true){
+          sd_card_write_values(fileSpi2Name, (char*)spi2Buffer, SPI_VALUES_TO_CONVERT);
+        }
+        flagReset_spi2 = true;
+      }
+
+
+
+      if (uartNewCommand == true){
+        switch (uartCommand) {
+          case 'a': // multiplexer X -> 0
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_RESET);
+            break;
+          case 'b': // multiplexer X -> 1
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET);
+            break;
+
+          case 'c': // multiplexer Y -> 0
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
+            break;
+
+          case 'd': // multiplexer Y -> 1
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
+            break;
+
+          case 'e': // multiplexer Z -> 0
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
+            break;
+
+          case 'f': // multiplexer Z -> 1
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
+            break;
+
+          //setting of SPi running or not
+          case 'g':
+            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
+            counterSPI2_EXTI = 0;
+            enableSPI2Interrupt = true;
+            HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+            break;
+
+          case 'h':
+            enableSPI2Interrupt = false;
+            //HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+            break;
+
+          case 'i':
+            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
+            counterSPI1_EXTI = 0;
+            enableSPI1Interrupt = true;
+            HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+            break;
+
+          case 'j':
+            enableSPI1Interrupt = false;
+            //HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+            break;
+
+          case 'p':
+            sd_card_write_values_enable = true;
+            break;
+
+          case 'q':
+            sd_card_write_values_enable = false;
+            break;
+
+
+
+
+
+          default:
+            break;
+        }
+        uartNewCommand = false;
+      }
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_SET);
+    HAL_Delay(500);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
+    HAL_Delay(500);
     }
   /* USER CODE END 3 */
 }
@@ -286,7 +436,18 @@ void PeriphCommonClock_Config(void)
 
   /** Initializes the peripherals clock
   */
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_CKPER;
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_FMC|RCC_PERIPHCLK_SDMMC
+                              |RCC_PERIPHCLK_CKPER;
+  PeriphClkInitStruct.PLL2.PLL2M = 4;
+  PeriphClkInitStruct.PLL2.PLL2N = 8;
+  PeriphClkInitStruct.PLL2.PLL2P = 2;
+  PeriphClkInitStruct.PLL2.PLL2Q = 2;
+  PeriphClkInitStruct.PLL2.PLL2R = 2;
+  PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_3;
+  PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
+  PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
+  PeriphClkInitStruct.FmcClockSelection = RCC_FMCCLKSOURCE_PLL2;
+  PeriphClkInitStruct.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL2;
   PeriphClkInitStruct.CkperClockSelection = RCC_CLKPSOURCE_HSI;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
@@ -344,7 +505,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -392,7 +553,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi2.Init.CLKPhase = SPI_PHASE_2EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -708,23 +869,24 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
+  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
   /* DMA1_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
-  /* DMA1_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
-  /* DMA1_Stream4_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
-  /* DMA1_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-  /* DMA1_Stream6_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+  /* DMA1_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
+  /* DMA2_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 
 }
 
@@ -849,14 +1011,73 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-
 }
 
 /* USER CODE BEGIN 4 */
+// TODO:
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
+  //SPI1 MISO
+  if ((GPIO_Pin == GPIO_PIN_6) && (enableSPI1Interrupt)){
+    if (counterSPI1_EXTI < SPI_VALUES_TO_CONVERT){
+      HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+      HAL_SPI_TransmitReceive_DMA(&hspi1, pTxData, (spi1Buffer + counterSPI1_EXTI*4), 4);
+
+    }
+  }
+
+
+  //SPI2 MISO
+  else if ((GPIO_Pin == GPIO_PIN_14) && (enableSPI2Interrupt)){
+    if (counterSPI2_EXTI < SPI_VALUES_TO_CONVERT){
+      HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+      HAL_SPI_TransmitReceive_DMA(&hspi2, pTxData, (spi2Buffer+ counterSPI2_EXTI*4), 4);
+    }
+  }
+
+
+  // buttons
+  else if (GPIO_Pin == GPIO_PIN_7){
+    //flagReset = true;
+  }
+  else if (GPIO_Pin == GPIO_PIN_9){
+    sendToSDcard = true;
+  }
+}
+
+//FIXME: changed here from TxRx to Rx
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+  if (hspi == &hspi1){
+    counterSPI1_EXTI++;
+    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+    __NOP();
+  }
+
+  if (hspi == &hspi2){
+    counterSPI2_EXTI++;
+    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    __NOP();
+  }
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  if (huart == &huart4){
+    HAL_UART_Receive_IT (&huart4, rxUart4Buffer, 1);
+    uartCommand = rxUart4Buffer[0];
+    uartNewCommand = true;
+
+  }else if (huart == &huart5){
+    HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
+    uartCommand = rxUart5Buffer[0];
+    uartNewCommand = true;
+  }
+
+
+}
 /* USER CODE END 4 */
 
 /**
