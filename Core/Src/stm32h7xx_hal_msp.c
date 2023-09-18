@@ -277,7 +277,14 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     HAL_NVIC_EnableIRQ(SPI1_IRQn);
   /* USER CODE BEGIN SPI1_MspInit 1 */
 
-    // SPI1 MISO interrput setting
+//    GPIO_InitStruct.Pin = GPIO_PIN_11;
+//    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+//    GPIO_InitStruct.Pull = GPIO_PULLUP;
+//    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+//    GPIO_InitStruct.Alternate = GPIO_AF5_SPI1;
+//    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+    // SPI1 MISO interrput
     GPIO_InitStruct.Pin = GPIO_PIN_6;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP | GPIO_MODE_IT_FALLING; //GPIO_MODE_AF_PP  | TRIGGER_RISING | TRIGGER_FALLING;
     GPIO_InitStruct.Pull = GPIO_NOPULL;

@@ -124,7 +124,7 @@ volatile uint8_t rxUart5Buffer[1];
 volatile uint8_t uartCommand;
 volatile bool uartNewCommand = false;
 
-bool enableSPI1Interrupt = false;
+volatile bool enableSPI1Interrupt = false;
 bool enableSPI2Interrupt = false;
 bool enableSPI4Interrupt = false;
 // TODO: Testing of SDRAM array
@@ -228,6 +228,7 @@ int main(void)
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 1);
   HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
   HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+
   spi1_soft_reset();
   spi2_soft_reset();
   spi4_soft_reset();
@@ -355,11 +356,10 @@ int main(void)
           case 'q':
             sd_card_write_values_enable = false;
             break;
-
-
-
-
-
+          case 'w':
+            HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+            break;
+//FIXME
           default:
             break;
         }
@@ -1038,15 +1038,15 @@ static void MX_GPIO_Init(void)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
   //SPI1 MISO
-  if ((GPIO_Pin == GPIO_PIN_6) && (enableSPI1Interrupt)){
-//    HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
-    enableSPI1Interrupt = false;
+  if ((GPIO_Pin == GPIO_PIN_6) && (enableSPI1Interrupt == true)){
+    HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+//    enableSPI1Interrupt = false;
     HAL_SPI_TransmitReceive_DMA(&hspi1, pTxData, spi1Buffer, 4);
   }
 
   //SPI2 MISO
   else if ((GPIO_Pin == GPIO_PIN_14) && (enableSPI2Interrupt)){
-//      HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+//    HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
     enableSPI2Interrupt = false;
     HAL_SPI_TransmitReceive_DMA(&hspi2, pTxData, spi2Buffer, 4);
   }
@@ -1060,9 +1060,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
   // buttons
   else if (GPIO_Pin == GPIO_PIN_7){
+    __NOP();
     //flagReset = true;
   }
   else if (GPIO_Pin == GPIO_PIN_9){
+    __NOP();
     sendToSDcard = true;
   }
 }
@@ -1071,11 +1073,13 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi == &hspi1){
-    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
-    enableSPI1Interrupt = true;
+    //__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
 //    adcValue_x = ((uint32_t)spi1Buffer[0] << 24) | ((uint32_t)spi1Buffer[1] << 16) | ((uint32_t)spi1Buffer[2] << 8) | spi1Buffer[3];
 //    int adcLength_x = sprintf((char *)uartBuffer_x, "%12lu", value_x);
     spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
+    __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+//    enableSPI1Interrupt = true;
   }
 
   if (hspi == &hspi2){
@@ -1083,14 +1087,14 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
     enableSPI2Interrupt = true;
 //    adcValue_y = ((uint32_t)spi2Buffer[0] << 24) | ((uint32_t)spi2Buffer[1] << 16) | ((uint32_t)spi2Buffer[2] << 8) | spi2Buffer[3];
 //    int adcLength_y = sprintf((char *)uartBuffer_y, "%12lu", adcValue_y);
-    spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
+    //spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
   }
   if (hspi == &hspi4){
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
     enableSPI4Interrupt = true;
 //    adcValue_y = ((uint32_t)spi2Buffer[0] << 24) | ((uint32_t)spi2Buffer[1] << 16) | ((uint32_t)spi2Buffer[2] << 8) | spi2Buffer[3];
 //    int adcLength_y = sprintf((char *)uartBuffer_y, "%12lu", adcValue_y);
-    spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
+    //spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
   }
 }
 
