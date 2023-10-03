@@ -40,6 +40,7 @@
 #define SDRAM_ADD_INCREMENT 0x3000000
 #define ARRAY_SIZE 12582912
 #define SPI_VALUES_TO_CONVERT 5
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -65,7 +66,6 @@ TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart4;
-UART_HandleTypeDef huart5;
 
 SDRAM_HandleTypeDef hsdram1;
 
@@ -87,6 +87,7 @@ HAL_StatusTypeDef spiStatus[40];
 uint8_t pTxData[] = {0x00, 0x00, 0x00, 0x00};
 uint8_t adcRawVaues[800]; // 40 x 32bit values
 uint32_t tmp_uartCounter = 0;
+uint8_t defaultSPS = 0x14;
 
 //uint8_t spi1Buffer[100000] __attribute__ ((at(SDRAM_ADD)));
 //uint8_t spi2Buffer[100000] __attribute__ ((at(SDRAM_ADD + SDRAM_ADD_INCREMENT)));
@@ -143,21 +144,11 @@ static void MX_UART4_Init(void);
 static void MX_FMC_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_SPI4_Init(void);
-static void MX_UART5_Init(void);
 static void MX_DMA_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_SDMMC1_SD_Init(void);
 /* USER CODE BEGIN PFP */
-/*
-void spi1_adc_init(void);
-void spi2_adc_init(void);
-void spi1_read_send_default(void);
-void spi2_read_send_default(void);
-void spi1_read_write_continuous_conversion_mode(void);
-void spi1_compute_and_send_values(void);
-void spi1_read_2k_samples(void);
-void spi1_soft_reset(void);
-void spi1_read_register(void);*/
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -202,7 +193,6 @@ int main(void)
   MX_FMC_Init();
   MX_SPI2_Init();
   MX_SPI4_Init();
-  MX_UART5_Init();
   MX_TIM2_Init();
   MX_SDMMC1_SD_Init();
   MX_FATFS_Init();
@@ -219,12 +209,20 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
     //
+//  //SYSCFG->EXTICR[1] &= ~(SYSCFG_EXTICR1_EXTI1_Msk);
+//  SYSCFG->EXTICR[1] |=  (SYSCFG_EXTICR2_EXTI5_PE);
+//  // Setup the button's EXTI line as an interrupt.
+//  EXTI->IMR1  |=  (1 << 5);
+//  // Disable the 'rising edge' trigger (button release).
+//  EXTI->RTSR1 &= ~(1 << 5);
+//  // Enable the 'falling edge' trigger (button press).
+//  EXTI->FTSR1 |=  (1 << 5);
 
   SDRAM_Startup_Sequence(&hsdram1, &fmc_command);
   sd_card_init();
   HAL_Delay(1000);
 
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 1, 1);
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 4, 4);
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 1);
   HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
   HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
@@ -232,9 +230,10 @@ int main(void)
   spi1_soft_reset();
   spi2_soft_reset();
   spi4_soft_reset();
-  spi1_adc_init();
-  spi2_adc_init();
-  spi4_adc_init();
+  spi1_adc_init(defaultSPS);
+  spi2_adc_init(defaultSPS);
+  spi4_adc_init(defaultSPS);
+//  readRegister();
 //  t1 = DWT->CYCCNT;
   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
@@ -244,7 +243,7 @@ int main(void)
 
   // uart IT enable
   HAL_UART_Receive_IT (&huart4, rxUart4Buffer, 1);
-  HAL_UART_Receive_IT (&huart5, rxUart4Buffer, 1);
+  //HAL_UART_Receive_IT (&huart5, rxUart4Buffer, 1);
   // FIXME main
   //sd_card_test_script();
 
@@ -258,16 +257,14 @@ int main(void)
 
     while (1){
 
-      //HAL_UART_Transmit(&huart4, "x11,20,50,17851", 15, 100);
-
-      if (flagReset_spi1 == true){
-        flagReset_spi1 = false;
-        counterSPI1_EXTI = 0;
-      }
-      else if (flagReset_spi2 == true){
-        flagReset_spi2 = false;
-        counterSPI2_EXTI = 0;
-      }
+//      if (flagReset_spi1 == true){
+//        flagReset_spi1 = false;
+//        counterSPI1_EXTI = 0;
+//      }
+//      else if (flagReset_spi2 == true){
+//        flagReset_spi2 = false;
+//        counterSPI2_EXTI = 0;
+//      }
 
 //      if(counterSPI1_EXTI >= SPI_VALUES_TO_CONVERT){
 //        //t2 = DWT->CYCCNT;
@@ -358,6 +355,23 @@ int main(void)
             break;
           case 'w':
             HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+            break;
+
+         // Numbers reserved for SPS values
+          case '0':
+            //set SPS to 5
+            break;
+          case '1':
+            //set SPS to 20
+            break;
+          case '2':
+            //set SPS to 100
+            break;
+          case '3':
+            //set SPS to 500
+            break;
+          case '4':
+            //set SPS to 1000
             break;
 //FIXME
           default:
@@ -831,54 +845,6 @@ static void MX_UART4_Init(void)
 }
 
 /**
-  * @brief UART5 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_UART5_Init(void)
-{
-
-  /* USER CODE BEGIN UART5_Init 0 */
-
-  /* USER CODE END UART5_Init 0 */
-
-  /* USER CODE BEGIN UART5_Init 1 */
-
-  /* USER CODE END UART5_Init 1 */
-  huart5.Instance = UART5;
-  huart5.Init.BaudRate = 115200;
-  huart5.Init.WordLength = UART_WORDLENGTH_8B;
-  huart5.Init.StopBits = UART_STOPBITS_1;
-  huart5.Init.Parity = UART_PARITY_NONE;
-  huart5.Init.Mode = UART_MODE_TX_RX;
-  huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart5.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart5.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart5.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart5.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart5) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart5, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart5, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&huart5) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN UART5_Init 2 */
-
-  /* USER CODE END UART5_Init 2 */
-
-}
-
-/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -977,6 +943,9 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, MULT_IN_X_Pin|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11
                           |GPIO_PIN_12, GPIO_PIN_RESET);
 
@@ -988,6 +957,13 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, GPIO_PIN_10|USB_C_Reset_Pin|USB_C_Alert_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PE4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PF7 PF9 */
   GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_9;
@@ -1038,22 +1014,24 @@ static void MX_GPIO_Init(void)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
   //SPI1 MISO
-  if ((GPIO_Pin == GPIO_PIN_6) && (enableSPI1Interrupt == true)){
+//  if ((GPIO_Pin == GPIO_PIN_6) && (enableSPI1Interrupt == true)){
+  if (GPIO_Pin == GPIO_PIN_6){
     HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
 //    enableSPI1Interrupt = false;
     HAL_SPI_TransmitReceive_DMA(&hspi1, pTxData, spi1Buffer, 4);
   }
 
   //SPI2 MISO
-  else if ((GPIO_Pin == GPIO_PIN_14) && (enableSPI2Interrupt)){
-//    HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-    enableSPI2Interrupt = false;
+  else if (GPIO_Pin == GPIO_PIN_14){
+    HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+//    enableSPI2Interrupt = false;
     HAL_SPI_TransmitReceive_DMA(&hspi2, pTxData, spi2Buffer, 4);
   }
   //SPI4 MISO
-  else if ((GPIO_Pin == GPIO_PIN_5) && (enableSPI4Interrupt)){
-//      HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-    enableSPI4Interrupt = false;
+//  else if ((GPIO_Pin == GPIO_PIN_5) && (enableSPI4Interrupt)){
+  else if (GPIO_Pin == GPIO_PIN_5){
+    HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+//    enableSPI4Interrupt = false;
     HAL_SPI_TransmitReceive_DMA(&hspi4, pTxData, spi4Buffer, 4);
   }
 
@@ -1073,28 +1051,21 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi == &hspi1){
-    //__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
-//    adcValue_x = ((uint32_t)spi1Buffer[0] << 24) | ((uint32_t)spi1Buffer[1] << 16) | ((uint32_t)spi1Buffer[2] << 8) | spi1Buffer[3];
-//    int adcLength_x = sprintf((char *)uartBuffer_x, "%12lu", value_x);
     spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-//    enableSPI1Interrupt = true;
   }
 
   if (hspi == &hspi2){
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
     enableSPI2Interrupt = true;
-//    adcValue_y = ((uint32_t)spi2Buffer[0] << 24) | ((uint32_t)spi2Buffer[1] << 16) | ((uint32_t)spi2Buffer[2] << 8) | spi2Buffer[3];
-//    int adcLength_y = sprintf((char *)uartBuffer_y, "%12lu", adcValue_y);
-    //spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
   }
+
   if (hspi == &hspi4){
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
     enableSPI4Interrupt = true;
-//    adcValue_y = ((uint32_t)spi2Buffer[0] << 24) | ((uint32_t)spi2Buffer[1] << 16) | ((uint32_t)spi2Buffer[2] << 8) | spi2Buffer[3];
-//    int adcLength_y = sprintf((char *)uartBuffer_y, "%12lu", adcValue_y);
-    //spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
   }
 }
 
@@ -1105,10 +1076,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     uartCommand = rxUart4Buffer[0];
     uartNewCommand = true;
 
-  }else if (huart == &huart5){
-    HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
-    uartCommand = rxUart5Buffer[0];
-    uartNewCommand = true;
+//  }else if (huart == &huart5){
+//    HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
+//    uartCommand = rxUart5Buffer[0];
+//    uartNewCommand = true;
   }
 
 

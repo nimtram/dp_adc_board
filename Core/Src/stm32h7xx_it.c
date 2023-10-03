@@ -66,7 +66,6 @@ extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
 extern SPI_HandleTypeDef hspi4;
 extern UART_HandleTypeDef huart4;
-extern UART_HandleTypeDef huart5;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -336,20 +335,6 @@ void UART4_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles UART5 global interrupt.
-  */
-void UART5_IRQHandler(void)
-{
-  /* USER CODE BEGIN UART5_IRQn 0 */
-
-  /* USER CODE END UART5_IRQn 0 */
-  HAL_UART_IRQHandler(&huart5);
-  /* USER CODE BEGIN UART5_IRQn 1 */
-
-  /* USER CODE END UART5_IRQn 1 */
-}
-
-/**
   * @brief This function handles DMA2 stream0 global interrupt.
   */
 void DMA2_Stream0_IRQHandler(void)
@@ -381,6 +366,7 @@ void SPI4_IRQHandler(void)
 void EXTI9_5_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI9_5_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_5);
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_6);
   /* USER CODE END EXTI9_5_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);

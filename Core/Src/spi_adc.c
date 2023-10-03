@@ -32,15 +32,12 @@ extern UART_HandleTypeDef huart5;
 uint32_t readIndex=0;
 uint8_t adc_values[80];
 
-void spi1_adc_init(void){
-  GPIOG->PUPDR |= (uint32_t)0x400000;
+void spi1_adc_init(uint8_t spsValue){
+  //GPIOG->PUPDR |= (uint32_t)0x400000;
 
   uint8_t setupConfigurationRegister[] = {0x20};
 //  uint8_t setupConfiguration[] = {0x1F, 0x30};//{0x13, 0x00}; FIXME testing..
   uint8_t setupConfiguration[] = {0x10, 0x00};//{0x13, 0x00}; FIXME testing..
-
-  uint8_t adcGainRegister[] = {0x38};
-  uint8_t adcGain[] = {0x40, 0x00, 0x00};
 
   uint8_t adcModeRegister[] = {0x01};
   uint8_t adcMode[] = {0x0, 0x0};
@@ -52,20 +49,13 @@ void spi1_adc_init(void){
   uint8_t continuousConvEnable[] = {0x00, 0x82};
 
   uint8_t dataWriteSPS_REGISTER[] = {0x28};
-  uint8_t dataWriteSPS[] = {0x05, 0x14}; // 5000SPS = 0x08, 1000SPS = 0x0A, 100SPS = 0x0E, 5SPS = 0x14
+  uint8_t dataWriteSPS[] = {0x05, spsValue}; // 5000SPS = 0x08, 1000SPS = 0x0A, 100SPS = 0x0E, 5SPS = 0x14
 
   uint8_t dataWriteSyncError_REGISTER[] = {0x06};
   uint8_t dataWriteSyncError[] = {0x00, 0x00};
 
-
-
-
   /*Start init ADC1*/
   HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 0);
-
-
-
-
 
   /* Switch AIN0 and AIN1 as inputs due to change in scheme */
   HAL_SPI_Transmit(&hspi1, adcChannelRegister, 1, 100);
@@ -75,10 +65,9 @@ void spi1_adc_init(void){
   HAL_Delay(1);
   HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 0);
 
-
   /* Set external reference to be used */
-  uint8_t setupConfigurationBuffer[] = {0x20, 0x10, 0x00};
-  HAL_SPI_Transmit(&hspi1, setupConfigurationBuffer, 3, 100);
+  HAL_SPI_Transmit(&hspi1, setupConfigurationRegister, 1, 100);
+  HAL_SPI_Transmit(&hspi1, setupConfiguration, 2, 100);
 
   HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 1);
   HAL_Delay(1);
@@ -91,8 +80,6 @@ void spi1_adc_init(void){
   HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 1);
   HAL_Delay(1);
   HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 0);
-
-
 
   /* Set SPS */
   HAL_SPI_Transmit(&hspi1, dataWriteSPS_REGISTER, 1, 100);
@@ -110,12 +97,6 @@ void spi1_adc_init(void){
   HAL_Delay(1);
   HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 0);
 
-  volatile uint8_t pRxData[] = {0x00, 0x00, 0x00};
-  volatile uint8_t pTxData[] = {0x60, 0x00, 0x00};
-  HAL_SPI_TransmitReceive(&hspi1, pTxData, pRxData,3,100);
-  __NOP();
-
-
   /* Set 32bit values and continuous coversion mode */
   HAL_SPI_Transmit(&hspi1, continuousConvEnableRegister, 1, 100);
   HAL_SPI_Transmit(&hspi1, continuousConvEnable, 2, 100);
@@ -123,15 +104,12 @@ void spi1_adc_init(void){
   HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 1);
 }
 
-void spi2_adc_init(void){
+void spi2_adc_init(uint8_t spsValue){
 //  GPIOC->PUPDR |= (uint32_t)0x400000;
 
   uint8_t setupConfigurationRegister[] = {0x20};
 //  uint8_t setupConfiguration[] = {0x1F, 0x30};//{0x13, 0x00}; FIXME testing..
   uint8_t setupConfiguration[] = {0x10, 0x00};//{0x13, 0x00}; FIXME testing..
-
-  uint8_t adcGainRegister[] = {0x38};
-  uint8_t adcGain[] = {0x40, 0x00, 0x00};
 
   uint8_t adcModeRegister[] = {0x01};
   uint8_t adcMode[] = {0x0, 0x0};
@@ -143,7 +121,7 @@ void spi2_adc_init(void){
   uint8_t continuousConvEnable[] = {0x00, 0x82};
 
   uint8_t dataWriteSPS_REGISTER[] = {0x28};
-  uint8_t dataWriteSPS[] = {0x05, 0x14}; // 5000SPS = 0x08, 1000SPS = 0x0A, 100SPS = 0x0E, 5SPS = 0x14
+  uint8_t dataWriteSPS[] = {0x05, spsValue}; // 5000SPS = 0x08, 1000SPS = 0x0A, 100SPS = 0x0E, 5SPS = 0x14
 
   uint8_t dataWriteSyncError_REGISTER[] = {0x06};
   uint8_t dataWriteSyncError[] = {0x00, 0x00};
@@ -151,25 +129,45 @@ void spi2_adc_init(void){
   /*Start init ADC2*/
   HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 0);
 
+  /* Switch AIN0 and AIN1 as inputs due to change in scheme */
+  HAL_SPI_Transmit(&hspi2, adcChannelRegister, 1, 100);
+  HAL_SPI_Transmit(&hspi2, adcChannel, 2, 100);
+
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 0);
+
   /* Set external reference to be used */
   HAL_SPI_Transmit(&hspi2, setupConfigurationRegister, 1, 100);
   HAL_SPI_Transmit(&hspi2, setupConfiguration, 2, 100);
 
-  /* Switch AIN0 and AIN1 as inputs due to change in scheme */
-  HAL_SPI_Transmit(&hspi2, adcChannelRegister, 1, 100);
-  HAL_SPI_Transmit(&hspi2, adcChannel, 2, 100);
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 0);
 
   /* Set continuous conversion mode */
   HAL_SPI_Transmit(&hspi2, adcModeRegister, 1, 100);
   HAL_SPI_Transmit(&hspi2, adcMode, 2, 100);
 
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 0);
+
   /* Set SPS */
   HAL_SPI_Transmit(&hspi2, dataWriteSPS_REGISTER, 1, 100);
   HAL_SPI_Transmit(&hspi2, dataWriteSPS, 2, 100);
 
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 0);
+
   /* Set sync pin  */
   HAL_SPI_Transmit(&hspi2, dataWriteSyncError_REGISTER, 1, 100);
   HAL_SPI_Transmit(&hspi2, dataWriteSyncError, 2, 100);
+
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 0);
 
   /* Set 32bit values and continuous coversion mode */
   HAL_SPI_Transmit(&hspi2, continuousConvEnableRegister, 1, 100);
@@ -178,15 +176,12 @@ void spi2_adc_init(void){
   HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 1);
 }
 
-void spi4_adc_init(void){
+void spi4_adc_init(uint8_t spsValue){
 //  GPIOC->PUPDR |= (uint32_t)0x400000;
 
   uint8_t setupConfigurationRegister[] = {0x20};
 //  uint8_t setupConfiguration[] = {0x1F, 0x30};//{0x13, 0x00}; FIXME testing..
   uint8_t setupConfiguration[] = {0x10, 0x00};//{0x13, 0x00}; FIXME testing..
-
-  uint8_t adcGainRegister[] = {0x38};
-  uint8_t adcGain[] = {0x40, 0x00, 0x00};
 
   uint8_t adcModeRegister[] = {0x01};
   uint8_t adcMode[] = {0x0, 0x0};
@@ -198,7 +193,7 @@ void spi4_adc_init(void){
   uint8_t continuousConvEnable[] = {0x00, 0x82};
 
   uint8_t dataWriteSPS_REGISTER[] = {0x28};
-  uint8_t dataWriteSPS[] = {0x05, 0x14}; // 5000SPS = 0x08, 1000SPS = 0x0A, 100SPS = 0x0E, 5SPS = 0x14
+  uint8_t dataWriteSPS[] = {0x05, spsValue}; // 5000SPS = 0x08, 1000SPS = 0x0A, 100SPS = 0x0E, 5SPS = 0x14
 
   uint8_t dataWriteSyncError_REGISTER[] = {0x06};
   uint8_t dataWriteSyncError[] = {0x00, 0x00};
@@ -206,25 +201,45 @@ void spi4_adc_init(void){
   /*Start init ADC4*/
   HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 0);
 
+  /* Switch AIN0 and AIN1 as inputs due to change in scheme */
+  HAL_SPI_Transmit(&hspi4, adcChannelRegister, 1, 100);
+  HAL_SPI_Transmit(&hspi4, adcChannel, 2, 100);
+
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 0);
+
   /* Set external reference to be used */
   HAL_SPI_Transmit(&hspi4, setupConfigurationRegister, 1, 100);
   HAL_SPI_Transmit(&hspi4, setupConfiguration, 2, 100);
 
-  /* Switch AIN0 and AIN1 as inputs due to change in scheme */
-  HAL_SPI_Transmit(&hspi4, adcChannelRegister, 1, 100);
-  HAL_SPI_Transmit(&hspi4, adcChannel, 2, 100);
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 0);
 
   /* Set continuous conversion mode */
   HAL_SPI_Transmit(&hspi4, adcModeRegister, 1, 100);
   HAL_SPI_Transmit(&hspi4, adcMode, 2, 100);
 
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 0);
+
   /* Set SPS */
   HAL_SPI_Transmit(&hspi4, dataWriteSPS_REGISTER, 1, 100);
   HAL_SPI_Transmit(&hspi4, dataWriteSPS, 2, 100);
 
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 0);
+
   /* Set sync pin  */
   HAL_SPI_Transmit(&hspi4, dataWriteSyncError_REGISTER, 1, 100);
   HAL_SPI_Transmit(&hspi4, dataWriteSyncError, 2, 100);
+
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
+  HAL_Delay(1);
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 0);
 
   /* Set 32bit values and continuous coversion mode */
   HAL_SPI_Transmit(&hspi4, continuousConvEnableRegister, 1, 100);
@@ -232,6 +247,7 @@ void spi4_adc_init(void){
 
   HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
 }
+
 
 void run_all_adc(void){
   HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 0);
@@ -503,11 +519,11 @@ void spi_send_all_three_values(uint8_t* adcRawValue_x, uint8_t* adcRawValue_y, u
 
   HAL_UART_Transmit(&huart4, "x: ", 3, 10);
   HAL_UART_Transmit(&huart4, uartBuffer_x, (uint16_t)length_x, 10);
-  HAL_UART_Transmit(&huart4, " y: ", 4, 10);
+  HAL_UART_Transmit(&huart4, ", y: ", 5, 10);
   HAL_UART_Transmit(&huart4, uartBuffer_y, (uint16_t)length_y, 10);
-  HAL_UART_Transmit(&huart4, " z: ", 4, 10);
+  HAL_UART_Transmit(&huart4, ", z: ", 5, 10);
   HAL_UART_Transmit(&huart4, uartBuffer_z, (uint16_t)length_z, 10);
-  HAL_UART_Transmit(&huart4, "\n\r", 2, 10);
+  HAL_UART_Transmit(&huart4, "\n", 1, 10);
 
 }
 
@@ -532,4 +548,27 @@ void spi2_set_exti(void){
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+}
+
+
+
+void setNewSPStoAllADCs(uint8_t spsValue){
+  HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 1);
+  HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 1);
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
+  spi1_soft_reset();
+  spi2_soft_reset();
+  spi4_soft_reset();
+  spi1_adc_init(spsValue);
+  spi2_adc_init(spsValue);
+  spi4_adc_init(spsValue);
+}
+
+void readRegister(void){
+  volatile uint8_t pRxData[] = {0x00, 0x00, 0x00};
+  volatile uint8_t pTxData[] = {0x60, 0x00, 0x00};
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 0);
+  HAL_SPI_TransmitReceive(&hspi4, pTxData, pRxData,3,100);
+  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
+  __NOP();
 }

@@ -22,11 +22,12 @@ void spi1_read_write_continuous_conversion_mode(void);
 void spi1_read_it_mode();
 
 // used now:
-void spi1_adc_init(void);
-void spi2_adc_init(void);
-void spi4_adc_init(void);
+void spi1_adc_init(uint8_t spsValue);
+void spi2_adc_init(uint8_t spsValue);
+void spi4_adc_init(uint8_t spsValue);
 void run_all_adc(void);
+void setNewSPStoAllADCs(uint8_t spsValue);
 void spi_it_convert_and_send(uint8_t* adcRawVaues, uint32_t valuesToSend);
 void spi_send_all_three_values(uint8_t* adcRawValue_x, uint8_t* adcRawValue_y, uint8_t* adcRawValue_z);
-
+void readRegister(void);
 #endif /* FILE_HANDLING_H_ */
