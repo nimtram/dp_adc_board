@@ -87,7 +87,12 @@ HAL_StatusTypeDef spiStatus[40];
 uint8_t pTxData[] = {0x00, 0x00, 0x00, 0x00};
 uint8_t adcRawVaues[800]; // 40 x 32bit values
 uint32_t tmp_uartCounter = 0;
-uint8_t defaultSPS = 0x14;
+
+uint8_t SPS_VALUE_5 = 0x14;
+uint8_t SPS_VALUE_20 = 0x11;
+uint8_t SPS_VALUE_100 = 0x0E;
+uint8_t SPS_VALUE_500 = 0x0B;
+uint8_t SPS_VALUE_1000 = 0x0A;
 
 //uint8_t spi1Buffer[100000] __attribute__ ((at(SDRAM_ADD)));
 //uint8_t spi2Buffer[100000] __attribute__ ((at(SDRAM_ADD + SDRAM_ADD_INCREMENT)));
@@ -230,9 +235,9 @@ int main(void)
   spi1_soft_reset();
   spi2_soft_reset();
   spi4_soft_reset();
-  spi1_adc_init(defaultSPS);
-  spi2_adc_init(defaultSPS);
-  spi4_adc_init(defaultSPS);
+  spi1_adc_init(SPS_VALUE_5);
+  spi2_adc_init(SPS_VALUE_5);
+  spi4_adc_init(SPS_VALUE_5);
 //  readRegister();
 //  t1 = DWT->CYCCNT;
   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
@@ -360,18 +365,23 @@ int main(void)
          // Numbers reserved for SPS values
           case '0':
             //set SPS to 5
+            setNewSPStoAllADCs(SPS_VALUE_5);
             break;
           case '1':
             //set SPS to 20
+            setNewSPStoAllADCs(SPS_VALUE_20);
             break;
           case '2':
             //set SPS to 100
+            setNewSPStoAllADCs(SPS_VALUE_100);
             break;
           case '3':
             //set SPS to 500
+            setNewSPStoAllADCs(SPS_VALUE_500);
             break;
           case '4':
             //set SPS to 1000
+            setNewSPStoAllADCs(SPS_VALUE_1000);
             break;
 //FIXME
           default:
@@ -1058,13 +1068,12 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 
   if (hspi == &hspi2){
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
-    enableSPI2Interrupt = true;
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
   }
 
   if (hspi == &hspi4){
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
-    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     enableSPI4Interrupt = true;
   }
 }

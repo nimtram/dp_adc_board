@@ -562,6 +562,7 @@ void setNewSPStoAllADCs(uint8_t spsValue){
   spi1_adc_init(spsValue);
   spi2_adc_init(spsValue);
   spi4_adc_init(spsValue);
+  run_all_adc();
 }
 
 void readRegister(void){
