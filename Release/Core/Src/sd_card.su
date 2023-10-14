@@ -1,0 +1,8 @@
+../Core/Src/sd_card.c:12:6:sd_card_init	8	static,ignoring_inline_asm
+../Core/Src/sd_card.c:20:6:sd_card_deinit	8	static,ignoring_inline_asm
+../Core/Src/sd_card.c:29:6:sd_card_create_file	24	static,ignoring_inline_asm
+../Core/Src/sd_card.c:65:6:sd_card_open_file	8	static,ignoring_inline_asm
+../Core/Src/sd_card.c:74:6:sd_card_write_to_opened_file	16	static,ignoring_inline_asm
+../Core/Src/sd_card.c:86:6:sd_card_close_file	0	static
+../Core/Src/sd_card.c:91:6:sd_card_test	32	static
+../Core/Src/sd_card.c:104:6:sd_card_write_values	56	static
