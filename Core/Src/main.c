@@ -66,6 +66,7 @@ TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart4;
+DMA_HandleTypeDef hdma_uart4_tx;
 
 SDRAM_HandleTypeDef hsdram1;
 
@@ -203,10 +204,10 @@ int main(void)
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
   //spi1_set_exti();
-//  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-//  DWT->CYCCNT = 0;
-//  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-//  HAL_Delay(500);
+  CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+  DWT->CYCCNT = 0;
+  DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  HAL_Delay(500);
 
 
   /* USER CODE END 2 */
@@ -822,7 +823,7 @@ static void MX_UART4_Init(void)
 
   /* USER CODE END UART4_Init 1 */
   huart4.Instance = UART4;
-  huart4.Init.BaudRate = 115200;
+  huart4.Init.BaudRate = 3000000;
   huart4.Init.WordLength = UART_WORDLENGTH_8B;
   huart4.Init.StopBits = UART_STOPBITS_1;
   huart4.Init.Parity = UART_PARITY_NONE;
@@ -877,6 +878,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream3_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
   /* DMA1_Stream7_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream7_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream7_IRQn);
@@ -1040,6 +1044,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
   //SPI4 MISO
 //  else if ((GPIO_Pin == GPIO_PIN_5) && (enableSPI4Interrupt)){
   else if (GPIO_Pin == GPIO_PIN_5){
+    t1 = DWT->CYCCNT;
     HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
 //    enableSPI4Interrupt = false;
     HAL_SPI_TransmitReceive_DMA(&hspi4, pTxData, spi4Buffer, 4);
@@ -1075,6 +1080,9 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
     enableSPI4Interrupt = true;
+    t2 = DWT->CYCCNT;
+    unsigned long diff = t2 - t1;
+    __NOP();
   }
 }
 

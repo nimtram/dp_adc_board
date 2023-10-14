@@ -29,6 +29,8 @@ extern UART_HandleTypeDef huart4;
 extern UART_HandleTypeDef huart5;
 
 
+
+
 uint32_t readIndex=0;
 uint8_t adc_values[80];
 
@@ -485,9 +487,10 @@ void spi_send_all_three_values(uint8_t* adcRawValue_x, uint8_t* adcRawValue_y, u
   uint32_t value_x = 0;
   uint32_t value_y = 0;
   uint32_t value_z = 0;
-  uint8_t uartBuffer_x[20];
-  uint8_t uartBuffer_y[20];
-  uint8_t uartBuffer_z[20];
+  uint8_t uartBuffer_x[14];
+  uint8_t uartBuffer_y[14];
+  uint8_t uartBuffer_z[14];
+  uint8_t concatenatedBuffer[39];
 
   value_x = (uint32_t)adcRawValue_x[0];
   value_x = value_x<<8;
@@ -513,17 +516,21 @@ void spi_send_all_three_values(uint8_t* adcRawValue_x, uint8_t* adcRawValue_y, u
   value_z = value_z<<8;
   value_z = value_z | adcRawValue_z[3];
 
-  int length_x = sprintf((char *)uartBuffer_x, "%12lu", value_x);
-  int length_y = sprintf((char *)uartBuffer_y, "%12lu", value_y);
-  int length_z = sprintf((char *)uartBuffer_z, "%12lu", value_z);
+  int length_x = sprintf((char *)uartBuffer_x, "%10lu", value_x);
+  int length_y = sprintf((char *)uartBuffer_y, "%10lu", value_y);
+  int length_z = sprintf((char *)uartBuffer_z, "%10lu", value_z);
 
-  HAL_UART_Transmit(&huart4, "x: ", 3, 10);
-  HAL_UART_Transmit(&huart4, uartBuffer_x, (uint16_t)length_x, 10);
-  HAL_UART_Transmit(&huart4, ", y: ", 5, 10);
-  HAL_UART_Transmit(&huart4, uartBuffer_y, (uint16_t)length_y, 10);
-  HAL_UART_Transmit(&huart4, ", z: ", 5, 10);
-  HAL_UART_Transmit(&huart4, uartBuffer_z, (uint16_t)length_z, 10);
-  HAL_UART_Transmit(&huart4, "\n", 1, 10);
+  int lengthConCat = sprintf((char *)concatenatedBuffer, "%s %s %s\n", (char*)uartBuffer_x, (char*)uartBuffer_y, (char*)uartBuffer_z);
+
+  HAL_UART_Transmit(&huart4, concatenatedBuffer, 34,100);
+  __NOP();
+//
+//  HAL_UART_Transmit(&huart4, uartBuffer_x, (uint16_t)length_x, 10);
+//  HAL_UART_Transmit(&huart4, ", y: ", 5, 10);
+//  HAL_UART_Transmit(&huart4, uartBuffer_y, (uint16_t)length_y, 10);
+//  HAL_UART_Transmit(&huart4, ", z: ", 5, 10);
+//  HAL_UART_Transmit(&huart4, uartBuffer_z, (uint16_t)length_z, 10);
+//  HAL_UART_Transmit(&huart4, "\n", 1, 10);
 
 }
 
@@ -553,6 +560,8 @@ void spi2_set_exti(void){
 
 
 void setNewSPStoAllADCs(uint8_t spsValue){
+  HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+  HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
   HAL_GPIO_WritePin(SPI1_CS_PIN, SPI1_CS_PIN_NUMBER, 1);
   HAL_GPIO_WritePin(SPI2_CS_PIN, SPI2_CS_PIN_NUMBER, 1);
   HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
@@ -563,6 +572,12 @@ void setNewSPStoAllADCs(uint8_t spsValue){
   spi2_adc_init(spsValue);
   spi4_adc_init(spsValue);
   run_all_adc();
+  HAL_Delay(1);
+  __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
+  __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
+  __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 }
 
 void readRegister(void){
