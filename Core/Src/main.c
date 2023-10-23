@@ -96,17 +96,9 @@ uint8_t SPS_VALUE_100 = 0x0E;
 uint8_t SPS_VALUE_500 = 0x0B;
 uint8_t SPS_VALUE_1000 = 0x0A;
 
-//uint8_t test_spi1Buffer[100000] __attribute__ ((at(SDRAM_ADD)));
-//uint8_t test_spi2Buffer[100000] __attribute__ ((at(SDRAM_ADD + SDRAM_ADD_INCREMENT)));
-//uint8_t test_spi3Buffer[100000] __attribute__ ((at(SDRAM_ADD+SDRAM_ADD_INCREMENT+SDRAM_ADD_INCREMENT)));
-
-uint8_t spi1Buffer[4] = {0,0,0,0}; //FIXME
+uint8_t spi1Buffer[4] = {0,0,0,0};
 uint8_t spi2Buffer[4] = {0,0,0,0};
 uint8_t spi4Buffer[4] = {0,0,0,0};
-//uint8_t spi3Buffer[ARRAY_SIZE];
-//FIXME
-//uint8_t spi1Buffer = (uint8_t *)SDRAM_ADD;
-//uint8_t spi2Buffer = (uint8_t *)(SDRAM_ADD + SDRAM_ADD_INCREMENT);
 
 bool spiReadingOngoing;
 
@@ -125,8 +117,6 @@ int adcLength_x;
 int adcLength_x;
 int adcLength_x;
 
-
-
 volatile uint8_t rxUart4Buffer[1];
 volatile uint8_t rxUart5Buffer[1];
 volatile uint8_t uartCommand;
@@ -135,13 +125,10 @@ volatile bool uartNewCommand = false;
 volatile bool enableSPI1Interrupt = false;
 bool enableSPI2Interrupt = false;
 bool enableSPI4Interrupt = false;
-// TODO: Testing of SDRAM array
-//__attribute__((section(".sdram"))) unsigned char testArray[100];
+
 uint32_t spi1ValuesStorage[0x100000] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
 uint32_t spi2ValuesStorage[0x100000] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
 uint32_t spi4ValuesStorage[0x100000] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
-
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -209,18 +196,15 @@ int main(void)
   MX_FATFS_Init();
   MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
-  //spi1_set_exti();
+  // setting up timer for time measuring
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->CYCCNT = 0;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
   HAL_Delay(500);
-
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
   SDRAM_Startup_Sequence(&hsdram1, &fmc_command);
   sd_card_init();
   HAL_Delay(1000);
@@ -250,6 +234,7 @@ int main(void)
 
   // LED timer enable
   HAL_TIM_Base_Start_IT(&htim16);
+
   // FIXME main
   //sd_card_test_script();
 
@@ -294,30 +279,30 @@ int main(void)
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
             break;
 
-          //setting of SPi running or not
-          case 'g':
-            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
-            counterSPI2_EXTI = 0;
-            enableSPI2Interrupt = true;
-//            HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-            break;
-
-          case 'h':
-            enableSPI2Interrupt = false;
-            //HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-            break;
-
-          case 'i':
-            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
-            counterSPI1_EXTI = 0;
-            enableSPI1Interrupt = true;
-//            HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-            break;
-
-          case 'j':
-            enableSPI1Interrupt = false;
-            //HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
-            break;
+//          //setting of SPi running or not
+//          case 'g':
+//            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
+//            counterSPI2_EXTI = 0;
+//            enableSPI2Interrupt = true;
+////            HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+//            break;
+//
+//          case 'h':
+//            enableSPI2Interrupt = false;
+//            //HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+//            break;
+//
+//          case 'i':
+//            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
+//            counterSPI1_EXTI = 0;
+//            enableSPI1Interrupt = true;
+////            HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+//            break;
+//
+//          case 'j':
+//            enableSPI1Interrupt = false;
+//            //HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
+//            break;
 
           case 'p':
             sd_card_write_values_enable = true;
@@ -326,9 +311,10 @@ int main(void)
           case 'q':
             sd_card_write_values_enable = false;
             break;
-          case 'w':
-            HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-            break;
+
+//          case 'w':
+//            HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+//            break;
 
          // Numbers reserved for SPS values
           case '0':
@@ -351,20 +337,13 @@ int main(void)
             //set SPS to 1000
             setNewSPStoAllADCs(SPS_VALUE_1000);
             break;
-//FIXME
           default:
             break;
         }
         uartNewCommand = false;
       }
-
     /* USER CODE END WHILE */
-
     /* USER CODE BEGIN 3 */
-//    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_SET);
-//    HAL_Delay(500);
-//    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
-//    HAL_Delay(500);
     }
   /* USER CODE END 3 */
 }
@@ -1070,10 +1049,10 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
   }
 
   if (hspi == &hspi4){
-    spi1ValuesStorage[spiValuesBufferCounter] = spi1Buffer;
-    spi1ValuesStorage[spiValuesBufferCounter] = spi2Buffer;
-    spi1ValuesStorage[spiValuesBufferCounter] = spi4Buffer;
-    spiValuesBufferCounter++;
+//    spi1ValuesStorage[spiValuesBufferCounter] = spi1Buffer;
+//    spi1ValuesStorage[spiValuesBufferCounter] = spi2Buffer;
+//    spi1ValuesStorage[spiValuesBufferCounter] = spi4Buffer;
+//    spiValuesBufferCounter++;
     spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
