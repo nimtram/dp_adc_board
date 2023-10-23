@@ -90,6 +90,12 @@ uint8_t pTxData[] = {0x00, 0x00, 0x00, 0x00};
 uint8_t adcRawVaues[800]; // 40 x 32bit values
 uint32_t tmp_uartCounter = 0;
 uint32_t spiValuesBufferCounter = 0;
+
+uint32_t spi1ValuesBufferCounter = 0;
+uint32_t spi2ValuesBufferCounter = 0;
+uint32_t spi4ValuesBufferCounter = 0;
+uint32_t spiCommonBufferCounter = 0;
+
 uint8_t SPS_VALUE_5 = 0x14;
 uint8_t SPS_VALUE_20 = 0x11;
 uint8_t SPS_VALUE_100 = 0x0E;
@@ -126,9 +132,9 @@ volatile bool enableSPI1Interrupt = false;
 bool enableSPI2Interrupt = false;
 bool enableSPI4Interrupt = false;
 
-uint32_t spi1ValuesStorage[0x100000] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
-uint32_t spi2ValuesStorage[0x100000] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
-uint32_t spi4ValuesStorage[0x100000] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
+uint32_t spi1ValuesStorage[0x100] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
+uint32_t spi2ValuesStorage[0x100] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
+uint32_t spi4ValuesStorage[0x100] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -146,7 +152,7 @@ static void MX_TIM2_Init(void);
 static void MX_SDMMC1_SD_Init(void);
 static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
-
+uint32_t findMin(uint32_t a, uint32_t b, uint32_t c);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -247,6 +253,11 @@ int main(void)
   run_all_adc();
 
     while (1){
+      if(spiCommonBufferCounter < findMin(spi1ValuesBufferCounter,spi2ValuesBufferCounter,spi4ValuesBufferCounter)){
+        spi_send_all_three_values(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter]);
+        spiCommonBufferCounter++;
+      }
+
 
       if (uartNewCommand == true){
         switch (uartCommand) {
@@ -279,31 +290,6 @@ int main(void)
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
             break;
 
-//          //setting of SPi running or not
-//          case 'g':
-//            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
-//            counterSPI2_EXTI = 0;
-//            enableSPI2Interrupt = true;
-////            HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-//            break;
-//
-//          case 'h':
-//            enableSPI2Interrupt = false;
-//            //HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-//            break;
-//
-//          case 'i':
-//            __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
-//            counterSPI1_EXTI = 0;
-//            enableSPI1Interrupt = true;
-////            HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-//            break;
-//
-//          case 'j':
-//            enableSPI1Interrupt = false;
-//            //HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
-//            break;
-
           case 'p':
             sd_card_write_values_enable = true;
             break;
@@ -311,10 +297,6 @@ int main(void)
           case 'q':
             sd_card_write_values_enable = false;
             break;
-
-//          case 'w':
-//            HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-//            break;
 
          // Numbers reserved for SPS values
           case '0':
@@ -1018,10 +1000,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
   }
   //SPI4 MISO
   else if (GPIO_Pin == GPIO_PIN_5){
-    t1 = DWT->CYCCNT;
     HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
     HAL_SPI_TransmitReceive_DMA(&hspi4, pTxData, spi4Buffer, 4);
-  }
+   }
 
 
   // buttons
@@ -1039,27 +1020,24 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 {
   if (hspi == &hspi1){
+    spi1ValuesStorage[spi1ValuesBufferCounter] = (uint32_t)spi1Buffer[3] | ((uint32_t)spi1Buffer[2] << 8) | ((uint32_t)spi1Buffer[1] << 16) | ((uint32_t)spi1Buffer[0] << 24);;
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+    spi1ValuesBufferCounter++;
   }
 
   if (hspi == &hspi2){
+    spi2ValuesStorage[spi2ValuesBufferCounter] = (uint32_t)spi2Buffer[3] | ((uint32_t)spi2Buffer[2] << 8) | ((uint32_t)spi2Buffer[1] << 16) | ((uint32_t)spi2Buffer[0] << 24);
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
     HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+    spi2ValuesBufferCounter++;
   }
 
   if (hspi == &hspi4){
-//    spi1ValuesStorage[spiValuesBufferCounter] = spi1Buffer;
-//    spi1ValuesStorage[spiValuesBufferCounter] = spi2Buffer;
-//    spi1ValuesStorage[spiValuesBufferCounter] = spi4Buffer;
-//    spiValuesBufferCounter++;
-    spi_send_all_three_values(spi1Buffer, spi2Buffer, spi4Buffer);
+    spi4ValuesStorage[spi4ValuesBufferCounter] = (uint32_t)spi4Buffer[3] | ((uint32_t)spi4Buffer[2] << 8) | ((uint32_t)spi4Buffer[1] << 16) | ((uint32_t)spi4Buffer[0] << 24);
     __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
     HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-    enableSPI4Interrupt = true;
-    t2 = DWT->CYCCNT;
-    unsigned long diff = t2 - t1;
-    __NOP();
+    spi4ValuesBufferCounter++;
   }
 }
 
@@ -1081,6 +1059,20 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
   if(htim == &htim16){
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_12);
   }
+}
+
+uint32_t findMin(uint32_t a, uint32_t b, uint32_t c) {
+    uint32_t min = a;
+
+    if (b < min) {
+        min = b;
+    }
+
+    if (c < min) {
+        min = c;
+    }
+
+    return min;
 }
 /* USER CODE END 4 */
 

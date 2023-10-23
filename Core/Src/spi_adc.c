@@ -483,7 +483,7 @@ void spi_it_convert_and_send(uint8_t* adcRawVaues, uint32_t valuesToSend){
 }
 
 
-void spi_send_all_three_values(uint8_t* adcRawValue_x, uint8_t* adcRawValue_y, uint8_t* adcRawValue_z){
+void spi_send_all_three_values(uint32_t adcRawValue_x, uint32_t adcRawValue_y, uint32_t adcRawValue_z){
   uint32_t value_x = 0;
   uint32_t value_y = 0;
   uint32_t value_z = 0;
@@ -491,34 +491,34 @@ void spi_send_all_three_values(uint8_t* adcRawValue_x, uint8_t* adcRawValue_y, u
   uint8_t uartBuffer_y[14];
   uint8_t uartBuffer_z[14];
   uint8_t concatenatedBuffer[39];
+//
+//  value_x = (uint32_t)adcRawValue_x[0];
+//  value_x = value_x<<8;
+//  value_x = value_x | adcRawValue_x[1];
+//  value_x = value_x<<8;
+//  value_x = value_x | adcRawValue_x[2];
+//  value_x = value_x<<8;
+//  value_x = value_x | adcRawValue_x[3];
+//
+//  value_y = (uint32_t)adcRawValue_y[0];
+//  value_y = value_y<<8;
+//  value_y = value_y | adcRawValue_y[1];
+//  value_y = value_y<<8;
+//  value_y = value_y | adcRawValue_y[2];
+//  value_y = value_y<<8;
+//  value_y = value_y | adcRawValue_y[3];
+//
+//  value_z = (uint32_t)adcRawValue_z[0];
+//  value_z = value_z<<8;
+//  value_z = value_z | adcRawValue_z[1];
+//  value_z = value_z<<8;
+//  value_z = value_z | adcRawValue_z[2];
+//  value_z = value_z<<8;
+//  value_z = value_z | adcRawValue_z[3];
 
-  value_x = (uint32_t)adcRawValue_x[0];
-  value_x = value_x<<8;
-  value_x = value_x | adcRawValue_x[1];
-  value_x = value_x<<8;
-  value_x = value_x | adcRawValue_x[2];
-  value_x = value_x<<8;
-  value_x = value_x | adcRawValue_x[3];
-
-  value_y = (uint32_t)adcRawValue_y[0];
-  value_y = value_y<<8;
-  value_y = value_y | adcRawValue_y[1];
-  value_y = value_y<<8;
-  value_y = value_y | adcRawValue_y[2];
-  value_y = value_y<<8;
-  value_y = value_y | adcRawValue_y[3];
-
-  value_z = (uint32_t)adcRawValue_z[0];
-  value_z = value_z<<8;
-  value_z = value_z | adcRawValue_z[1];
-  value_z = value_z<<8;
-  value_z = value_z | adcRawValue_z[2];
-  value_z = value_z<<8;
-  value_z = value_z | adcRawValue_z[3];
-
-  int length_x = sprintf((char *)uartBuffer_x, "%10lu", value_x);
-  int length_y = sprintf((char *)uartBuffer_y, "%10lu", value_y);
-  int length_z = sprintf((char *)uartBuffer_z, "%10lu", value_z);
+  int length_x = sprintf((char *)uartBuffer_x, "%10lu", adcRawValue_x);
+  int length_y = sprintf((char *)uartBuffer_y, "%10lu", adcRawValue_y);
+  int length_z = sprintf((char *)uartBuffer_z, "%10lu", adcRawValue_z);
 
   int lengthConCat = sprintf((char *)concatenatedBuffer, "%s %s %s\n", (char*)uartBuffer_x, (char*)uartBuffer_y, (char*)uartBuffer_z);
 
