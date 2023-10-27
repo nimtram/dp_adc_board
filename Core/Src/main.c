@@ -84,7 +84,12 @@ bool flagReset_spi1 = false;
 bool flagReset_spi2 = false;
 bool flagReset_spi3 = false;
 bool sendToSDcard = false;
-bool sd_card_write_values_enable = false;
+bool sdCardWriteEnable = false;
+bool sdCardInitError = false;
+bool sdCardWriteError = false;
+bool sdCardOpenFileError = false;
+
+
 HAL_StatusTypeDef spiStatus[40];
 uint8_t pTxData[] = {0x00, 0x00, 0x00, 0x00};
 uint8_t adcRawVaues[800]; // 40 x 32bit values
@@ -135,6 +140,13 @@ bool enableSPI4Interrupt = false;
 uint32_t spi1ValuesStorage[0x100] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
 uint32_t spi2ValuesStorage[0x100] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
 uint32_t spi4ValuesStorage[0x100] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
+
+typedef enum {
+    red = 0,
+    green = 1,
+    blue = 2
+} colorLED;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -153,6 +165,7 @@ static void MX_SDMMC1_SD_Init(void);
 static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
 uint32_t findMin(uint32_t a, uint32_t b, uint32_t c);
+void setColorLED(colorLED color);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -202,6 +215,7 @@ int main(void)
   MX_FATFS_Init();
   MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
+
   // setting up timer for time measuring
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->CYCCNT = 0;
@@ -212,7 +226,7 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   SDRAM_Startup_Sequence(&hsdram1, &fmc_command);
-  sd_card_init();
+  sdCardInitError = sd_card_init();
   HAL_Delay(1000);
 
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 4, 4);
@@ -249,53 +263,73 @@ int main(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
 
+  if (sdCardInitError == true){
+    setColorLED(red);
+  }else{
+    setColorLED(blue);
+  }
+
   //run all before main loop
   run_all_adc();
 
     while (1){
       if(spiCommonBufferCounter < findMin(spi1ValuesBufferCounter,spi2ValuesBufferCounter,spi4ValuesBufferCounter)){
         spi_send_all_three_values(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter]);
-        spiCommonBufferCounter++;
+
+
+        if((sdCardWriteEnable == true) && (sdCardInitError == false) && (sdCardOpenFileError == false) ){
+          sdCardWriteError = sd_card_write_to_opened_file("sdfasf");
+          if (sdCardWriteError == true){
+            setColorLED(red);
+          }else{
+            setColorLED(green);
+          }
+        }
+
+
+      spiCommonBufferCounter++;
       }
+
+
 
 
       if (uartNewCommand == true){
         switch (uartCommand) {
           case 'a': // multiplexer X -> 0
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_RESET);
             break;
           case 'b': // multiplexer X -> 1
             HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET);
             break;
 
           case 'c': // multiplexer Y -> 0
             HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
             break;
 
           case 'd': // multiplexer Y -> 1
             HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
             break;
 
           case 'e': // multiplexer Z -> 0
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
             break;
 
           case 'f': // multiplexer Z -> 1
             HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
             break;
 
           case 'p':
-            sd_card_write_values_enable = true;
+            sdCardOpenFileError = sd_card_open_file();
+            if (sdCardOpenFileError == true){
+              setColorLED(red);
+            }else{
+              sdCardWriteEnable = true;
+            }
             break;
 
           case 'q':
-            sd_card_write_values_enable = false;
+            sdCardWriteEnable = false;
+            sd_card_close_file();
             break;
 
          // Numbers reserved for SPS values
@@ -1063,16 +1097,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 
 uint32_t findMin(uint32_t a, uint32_t b, uint32_t c) {
     uint32_t min = a;
-
     if (b < min) {
         min = b;
     }
-
     if (c < min) {
         min = c;
     }
-
     return min;
+}
+
+void setColorLED(colorLED color){
+  if(color == red){
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
+  }else if(color == blue){
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
+  } else if (color == green){
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
+  }
 }
 /* USER CODE END 4 */
 
