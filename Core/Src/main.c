@@ -128,10 +128,10 @@ int adcLength_x;
 int adcLength_x;
 int adcLength_x;
 
-volatile uint8_t rxUart4Buffer[1];
-volatile uint8_t rxUart5Buffer[1];
-volatile uint8_t uartCommand;
-volatile bool uartNewCommand = false;
+uint8_t rxUart4Buffer[1];
+uint8_t rxUart5Buffer[1];
+uint8_t uartCommand;
+bool uartNewCommand = false;
 
 volatile bool enableSPI1Interrupt = false;
 bool enableSPI2Interrupt = false;
@@ -272,13 +272,15 @@ int main(void)
   //run all before main loop
   run_all_adc();
 
+  char stringBufferValues[39];
+
     while (1){
       if(spiCommonBufferCounter < findMin(spi1ValuesBufferCounter,spi2ValuesBufferCounter,spi4ValuesBufferCounter)){
-        spi_send_all_three_values(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter]);
+        getStringFromValues(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues);
 
 
-        if((sdCardWriteEnable == true) && (sdCardInitError == false) && (sdCardOpenFileError == false) ){
-          sdCardWriteError = sd_card_write_to_opened_file("sdfasf");
+        if((sdCardWriteEnable == true) && (sdCardInitError == false) && (sdCardOpenFileError == false)){
+          sdCardWriteError = sd_card_write_to_opened_file(stringBufferValues);
           if (sdCardWriteError == true){
             setColorLED(red);
           }else{

@@ -28,6 +28,6 @@ void spi4_adc_init(uint8_t spsValue);
 void run_all_adc(void);
 void setNewSPStoAllADCs(uint8_t spsValue);
 void spi_it_convert_and_send(uint8_t* adcRawVaues, uint32_t valuesToSend);
-void spi_send_all_three_values(uint32_t adcRawValue_x, uint32_t adcRawValue_y, uint32_t adcRawValue_z);
+void getStringFromValues(uint32_t adcRawValue_x, uint32_t adcRawValue_y, uint32_t adcRawValue_z, char* concatenatedBuffer);
 void readRegister(void);
 #endif /* FILE_HANDLING_H_ */

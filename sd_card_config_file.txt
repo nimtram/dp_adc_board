@@ -1,0 +1,21 @@
+range_x: H
+range_y: L
+range_z: L
+sps: 5
+floating_point_values: 1
+saving_to_sd_card: 0
+gain_x: 0.005
+gain_y: 0.005
+gain_z: 0.005
+offset_x: 4
+offset_y: 8
+offset_z: 5
+// HINT:
+// range - range of measurement for each channel, possible range-0.5 - 0.5 V (L) or -10 - 10 V (H)
+// sps - samples per second, values to set: 5, 20, 100, 500, 1000
+// floating_point_values - set if values are supposed to be in 32bit format (0), or converted floatint point value in voltage (1)
+// saving_to_sd_card - enable (1) or disable (0) saving data to sd card
+// gain - gain for setting the offset, value possible in floating point format 
+// offset- offset for each channel, value in signed int format
+
+

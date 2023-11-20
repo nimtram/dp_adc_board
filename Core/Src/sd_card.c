@@ -143,7 +143,7 @@ void sd_card_write_values(char* name, char* buffer, uint32_t amountOfValues){
        varRes = varRes<<8;
        varRes = varRes | buffer[j+3];
 
-       int tmp = sprintf((char *)uartBuffer, "%lu", varRes);
+       (void)sprintf((char *)uartBuffer, "%lu", varRes);
        //sd_card_write_to_opened_file(name, uartBuffer);
        //sd_card_write_to_opened_file(name, (char*) "\n");
    }
