@@ -284,15 +284,11 @@ int main(void)
       if(spiCommonBufferCounter < findMin(spi1ValuesBufferCounter,spi2ValuesBufferCounter,spi4ValuesBufferCounter)){
         if (floating_point_values == true){
           getStringFromValuesFloat(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues, range_x_value, range_y_value, range_z_value);
-          HAL_UART_Transmit(&huart4, stringBufferValues, 33,100);
+          HAL_UART_Transmit(&huart4, stringBufferValues, 30,100);
         }else{
           getStringFromValues(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues);
           HAL_UART_Transmit(&huart4, stringBufferValues, 33,100);
         }
-
-        //sending over uart
-
-//        HAL_UART_Transmit(&huart5, stringBufferValues, 33,100);
 
         if((sdCardWriteEnable == true) && (sdCardInitError == false) && (sdCardOpenFileError == false)){
           sdCardWriteError = sd_card_write_to_opened_file(stringBufferValues);
@@ -332,12 +328,7 @@ int main(void)
             break;
 
           case 'p':
-
-            break;
-
-          case 'q':
-            sdCardWriteEnable = false;
-            sd_card_close_file();
+            floating_point_values = !floating_point_values;
             break;
 
          // Numbers reserved for SPS values
