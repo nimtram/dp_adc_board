@@ -29,5 +29,7 @@ void run_all_adc(void);
 void setNewSPStoAllADCs(uint8_t spsValue);
 void spi_it_convert_and_send(uint8_t* adcRawVaues, uint32_t valuesToSend);
 void getStringFromValues(uint32_t adcRawValue_x, uint32_t adcRawValue_y, uint32_t adcRawValue_z, char* concatenatedBuffer);
+void getStringFromValuesFloat(uint32_t adcRawValue_x, uint32_t adcRawValue_y, uint32_t adcRawValue_z, char* concatenatedBuffer, char resolutionX, char resolutionY, char resolutionZ);
 void readRegister(void);
+void formatFloatString(char* str, float floatValue);
 #endif /* FILE_HANDLING_H_ */

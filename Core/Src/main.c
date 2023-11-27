@@ -27,6 +27,8 @@
 #include "sd_card.h"
 #include "fmc_sdram.h"
 #include "spi_adc.h"
+#include <stdlib.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -147,6 +149,12 @@ typedef enum {
     blue = 2
 } colorLED;
 
+char range_x_value = 'H', range_y_value = 'H', range_z_value = 'H';
+uint16_t sps = 5;
+bool floating_point_values = false, saving_to_sd_card = false;
+float gain_x = 0.0f, gain_y = 0.0f, gain_z = 0.0f;
+int offset_x = 0, offset_y = 0, offset_z = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -166,6 +174,7 @@ static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
 uint32_t findMin(uint32_t a, uint32_t b, uint32_t c);
 void setColorLED(colorLED color);
+void initialSetupADC(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -227,12 +236,26 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   SDRAM_Startup_Sequence(&hsdram1, &fmc_command);
   sdCardInitError = sd_card_init();
-  HAL_Delay(1000);
+  HAL_Delay(100);
 
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 4, 4);
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 1, 1);
   HAL_NVIC_DisableIRQ(EXTI9_5_IRQn);
   HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+
+  // uart4 and uart5 IT enable
+  HAL_UART_Receive_IT (&huart4, rxUart4Buffer, 1);
+//  HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
+
+  // LED timer enable
+  HAL_TIM_Base_Start_IT(&htim16);
+
+  if (sdCardInitError == true){
+    setColorLED(red);
+  }else{
+    setColorLED(blue);
+    readConfigFile("config.txt");
+  }
 
   spi1_soft_reset();
   spi2_soft_reset();
@@ -240,44 +263,36 @@ int main(void)
   spi1_adc_init(SPS_VALUE_5);
   spi2_adc_init(SPS_VALUE_5);
   spi4_adc_init(SPS_VALUE_5);
-//  readRegister();
-//  t1 = DWT->CYCCNT;
+
+  //initial setup:
+  initialSetupADC();
+  HAL_Delay(500);
+
   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);
   __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_14);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
-  // uart IT enable
-  HAL_UART_Receive_IT (&huart4, rxUart4Buffer, 1);
-  //HAL_UART_Receive_IT (&huart5, rxUart4Buffer, 1);
-
-  // LED timer enable
-  HAL_TIM_Base_Start_IT(&htim16);
-
-  // FIXME main
-  //sd_card_test_script();
-
-  //initial setup:
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-
-  if (sdCardInitError == true){
-    setColorLED(red);
-  }else{
-    setColorLED(blue);
-  }
-
   //run all before main loop
   run_all_adc();
 
   char stringBufferValues[39];
 
+  floating_point_values = true;
     while (1){
       if(spiCommonBufferCounter < findMin(spi1ValuesBufferCounter,spi2ValuesBufferCounter,spi4ValuesBufferCounter)){
-        getStringFromValues(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues);
+        if (floating_point_values == true){
+          getStringFromValuesFloat(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues, range_x_value, range_y_value, range_z_value);
+          HAL_UART_Transmit(&huart4, stringBufferValues, 33,100);
+        }else{
+          getStringFromValues(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues);
+          HAL_UART_Transmit(&huart4, stringBufferValues, 33,100);
+        }
 
+        //sending over uart
+
+//        HAL_UART_Transmit(&huart5, stringBufferValues, 33,100);
 
         if((sdCardWriteEnable == true) && (sdCardInitError == false) && (sdCardOpenFileError == false)){
           sdCardWriteError = sd_card_write_to_opened_file(stringBufferValues);
@@ -287,12 +302,8 @@ int main(void)
             setColorLED(green);
           }
         }
-
-
       spiCommonBufferCounter++;
       }
-
-
 
 
       if (uartNewCommand == true){
@@ -321,12 +332,7 @@ int main(void)
             break;
 
           case 'p':
-            sdCardOpenFileError = sd_card_open_file();
-            if (sdCardOpenFileError == true){
-              setColorLED(red);
-            }else{
-              sdCardWriteEnable = true;
-            }
+
             break;
 
           case 'q':
@@ -361,6 +367,7 @@ int main(void)
         uartNewCommand = false;
       }
     /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
     }
   /* USER CODE END 3 */
@@ -1043,8 +1050,19 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
   // buttons
   else if (GPIO_Pin == GPIO_PIN_7){
-    __NOP();
-    //flagReset = true;
+    if(sdCardWriteEnable == false){
+      sdCardOpenFileError = sd_card_open_file();
+      if (sdCardOpenFileError == true){
+        setColorLED(red);
+      }else{
+        sdCardWriteEnable = true;
+      }
+    }else{
+      sdCardWriteEnable = false;
+      sd_card_close_file();
+      setColorLED(blue);
+    }
+
   }
   else if (GPIO_Pin == GPIO_PIN_9){
     __NOP();
@@ -1084,11 +1102,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     uartCommand = rxUart4Buffer[0];
     uartNewCommand = true;
 
-//  }else if (huart == &huart5){
-//    HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
-//    uartCommand = rxUart5Buffer[0];
-//    uartNewCommand = true;
   }
+//  else if (huart == &huart5){
+//      HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
+//      uartCommand = rxUart5Buffer[0];
+//      uartNewCommand = true;
+//  }
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
@@ -1122,6 +1141,112 @@ void setColorLED(colorLED color){
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);
   }
+}
+
+void readConfigFile(const char* filename) {
+  uint8_t bufferSize =128;
+  FRESULT result;
+  char buffer[bufferSize];
+
+  // Open the file
+  result = f_open(&SDFile, filename, FA_READ);
+  if (result != FR_OK) {
+      // Handle file open error
+  }
+
+  // Read and parse each line
+  while (f_gets(buffer, sizeof(buffer), &SDFile) != NULL) {
+      // Split the line into key and value
+      char* key = strtok(buffer, ": ");
+      char* value = strtok(NULL, ": ");
+
+      // Handle each key-value pair
+      if (strcmp(key, "range_x") == 0) {
+        // Save value for range_x
+        range_x_value = value[0];
+      } else if (strcmp(key, "range_y") == 0) {
+        // Save value for range_y
+        range_y_value = value[0];
+      } else if (strcmp(key, "range_z") == 0) {
+        // Save value for range_z
+        range_z_value = value[0];
+      } else if (strcmp(key, "sps") == 0) {
+        // Save value for sps
+        sps = atoi(value);
+      } else if (strcmp(key, "floating_point_values") == 0) {
+        // Save value for floating_point_values
+        floating_point_values = atoi(value) != 0;
+      } else if (strcmp(key, "saving_to_sd_card") == 0) {
+        // Save value for saving_to_sd_card
+        saving_to_sd_card =  atoi(value) != 0;
+      } else if (strcmp(key, "gain_x") == 0) {
+        // Save value for gain_x
+        gain_x = atof(value);
+      } else if (strcmp(key, "gain_y") == 0) {
+        // Save value for gain_y
+        gain_y = atof(value);
+      } else if (strcmp(key, "gain_z") == 0) {
+        // Save value for gain_z
+        gain_z = atof(value);
+      } else if (strcmp(key, "offset_x") == 0) {
+        // Save value for offset_x
+        offset_x = atoi(value);
+      } else if (strcmp(key, "offset_y") == 0) {
+        // Save value for offset_y
+        offset_y = atoi(value);
+      } else if (strcmp(key, "offset_z") == 0) {
+        // Save value for offset_z
+        offset_z = atoi(value);
+      }
+      // Add more key comparisons as needed
+
+      // Clear buffer for the next line
+      memset(buffer, 0, sizeof(buffer));
+  }
+
+  // Close the file
+  f_close(&SDFile);
+}
+
+void initialSetupADC(void){
+  if(range_x_value == 'H'){
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+  }else{
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+  }
+  if(range_y_value == 'H'){
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
+  }else{
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
+  }
+  if(range_y_value == 'H'){
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+  }else{
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+  }
+
+
+  spi1_soft_reset();
+  spi2_soft_reset();
+  spi4_soft_reset();
+  uint8_t spsHex = SPS_VALUE_5;
+  if (sps == 5){
+    spsHex = SPS_VALUE_5;
+  }else if(sps == 20){
+    spsHex = SPS_VALUE_20;
+  }else if(sps == 100){
+    spsHex = SPS_VALUE_100;
+  }else if(sps == 500){
+    spsHex = SPS_VALUE_500;
+  }else if(sps == 1000){
+    spsHex = SPS_VALUE_1000;
+  }
+
+  spi1_adc_init(spsHex);
+  spi2_adc_init(spsHex);
+  spi4_adc_init(spsHex);
+
+
 }
 /* USER CODE END 4 */
 

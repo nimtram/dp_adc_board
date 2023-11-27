@@ -18,6 +18,7 @@ void sd_card_deinit (void);
 bool sd_card_open_file(void);
 void sd_card_close_file(void);
 bool sd_card_write_to_opened_file(char * buffer);
+void readConfigFile(const char* filename);
 
 
 void sd_card_create_file(char* name);

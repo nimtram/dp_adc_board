@@ -201,11 +201,11 @@ void spi4_adc_init(uint8_t spsValue){
   uint8_t dataWriteSyncError[] = {0x00, 0x00};
 
   /*Start init ADC4*/
-  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 0);
-
-  /* Switch AIN0 and AIN1 as inputs due to change in scheme */
-  HAL_SPI_Transmit(&hspi4, adcChannelRegister, 1, 100);
-  HAL_SPI_Transmit(&hspi4, adcChannel, 2, 100);
+//  HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 0);
+//
+//  /* Switch AIN0 and AIN1 as inputs due to change in scheme */
+//  HAL_SPI_Transmit(&hspi4, adcChannelRegister, 1, 100);
+//  HAL_SPI_Transmit(&hspi4, adcChannel, 2, 100);
 
   HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
   HAL_Delay(1);
@@ -497,6 +497,44 @@ void getStringFromValues(uint32_t adcRawValue_x, uint32_t adcRawValue_y, uint32_
 //  HAL_UART_Transmit(&huart4, concatenatedBuffer, 34,100);
 }
 
+void getStringFromValuesFloat(uint32_t adcRawValue_x, uint32_t adcRawValue_y, uint32_t adcRawValue_z, char* concatenatedBuffer, char resolutionX, char resolutionY, char resolutionZ){
+  char uartBuffer_x[20];
+  char uartBuffer_y[20];
+  char uartBuffer_z[20];
+  float convertedValueX;
+  float convertedValueY;
+  float convertedValueZ;
+  if(resolutionX == 'H'){
+    convertedValueX = (20* (double)adcRawValue_x / (pow(2,32))) - 10 ;
+  }else{
+    convertedValueX = ((double)adcRawValue_x / (pow(2,32))) - 0.5 ;
+  }
+
+  if(resolutionY == 'H'){
+    convertedValueY = (20* (double)adcRawValue_y / (pow(2,32))) - 10 ;
+  }else{
+    convertedValueY = ((double)adcRawValue_y / (pow(2,32))) - 0.5 ;
+  }
+
+  if(resolutionZ == 'H'){
+    convertedValueZ = (20* (double)adcRawValue_z / (pow(2,32))) - 10 ;
+  }else{
+    convertedValueZ = ((double)adcRawValue_z / (pow(2,32))) - 0.5 ;
+  }
+
+  formatFloatString(uartBuffer_x,convertedValueX);
+  formatFloatString(uartBuffer_y,convertedValueY);
+  formatFloatString(uartBuffer_z,convertedValueZ);
+
+  //(void)sprintf(uartBuffer_x, "%6.3f", convertedValueX);
+//  (void)snprintf((char *)uartBuffer_x, 10, "%f", convertedValueX);
+//  (void)sprintf((char *)uartBuffer_y, "%.10f", convertedValueY);
+//  (void)sprintf((char *)uartBuffer_z, "%.10f", convertedValueZ);
+
+  (void)sprintf((char *)concatenatedBuffer, "%s %s %s\n", (char*)uartBuffer_x, (char*)uartBuffer_y, (char*)uartBuffer_z);
+
+}
+
 void spi1_set_exti(void){
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   GPIO_InitStruct.Pin = GPIO_PIN_6;
@@ -550,4 +588,13 @@ void readRegister(void){
   HAL_SPI_TransmitReceive(&hspi4, pTxData, pRxData,3,100);
   HAL_GPIO_WritePin(SPI4_CS_PIN, SPI4_CS_PIN_NUMBER, 1);
   __NOP();
+}
+
+void formatFloatString(char* str, float floatValue) {
+    char *tmpSign = (floatValue < 0) ? "-" : "";
+    float tmpVal = (floatValue < 0) ? -floatValue : floatValue;
+    int tmpInt1 = (int)tmpVal;                  // Get the integer part.
+    float tmpFrac = tmpVal - tmpInt1;           // Get the fractional part.
+    int tmpInt2 = (int)(tmpFrac * 10000000);    // Turn into integer.
+    sprintf(str, "%s%d.%07d", tmpSign, tmpInt1, tmpInt2);
 }

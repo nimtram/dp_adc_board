@@ -13,8 +13,10 @@
 ../Core/Src/spi_adc.c:416:6:spi1_read_register	48	static,ignoring_inline_asm
 ../Core/Src/spi_adc.c:435:6:spi1_read_it_mode	48	static,ignoring_inline_asm
 ../Core/Src/spi_adc.c:460:6:spi_it_convert_and_send	48	static
-../Core/Src/spi_adc.c:486:6:spi_send_all_three_values	152	static,ignoring_inline_asm
-../Core/Src/spi_adc.c:537:6:spi1_set_exti	32	static
-../Core/Src/spi_adc.c:550:6:spi2_set_exti	32	static
-../Core/Src/spi_adc.c:562:6:setNewSPStoAllADCs	16	static
-../Core/Src/spi_adc.c:583:6:readRegister	24	static,ignoring_inline_asm
+../Core/Src/spi_adc.c:486:6:getStringFromValues	80	static
+../Core/Src/spi_adc.c:500:6:getStringFromValuesFloat	104	static
+../Core/Src/spi_adc.c:538:6:spi1_set_exti	32	static
+../Core/Src/spi_adc.c:551:6:spi2_set_exti	32	static
+../Core/Src/spi_adc.c:563:6:setNewSPStoAllADCs	16	static
+../Core/Src/spi_adc.c:584:6:readRegister	24	static,ignoring_inline_asm
+../Core/Src/spi_adc.c:593:6:formatFloatString	48	static

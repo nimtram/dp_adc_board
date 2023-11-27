@@ -150,3 +150,5 @@ void sd_card_write_values(char* name, char* buffer, uint32_t amountOfValues){
 
  // sd_card_close_file(name);
 }
+
+
