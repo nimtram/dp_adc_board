@@ -591,10 +591,11 @@ void readRegister(void){
 }
 
 void formatFloatString(char* str, float floatValue) {
-    char *tmpSign = (floatValue < 0) ? "-" : "";
+    char *tmpSign = (floatValue < 0) ? "-" : "+";
     float tmpVal = (floatValue < 0) ? -floatValue : floatValue;
     int tmpInt1 = (int)tmpVal;                  // Get the integer part.
     float tmpFrac = tmpVal - tmpInt1;           // Get the fractional part.
     int tmpInt2 = (int)(tmpFrac * 10000000);    // Turn into integer.
     sprintf(str, "%s%d.%07d", tmpSign, tmpInt1, tmpInt2);
+
 }

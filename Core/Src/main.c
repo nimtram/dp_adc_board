@@ -39,7 +39,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define SDRAM_ADD 0xC0000000
-#define SDRAM_ADD_INCREMENT 0x3000000
+#define SDRAM_ADD_INCREMENT 0x27AC40
 #define ARRAY_SIZE 12582912
 #define SPI_VALUES_TO_CONVERT 5
 
@@ -139,9 +139,9 @@ volatile bool enableSPI1Interrupt = false;
 bool enableSPI2Interrupt = false;
 bool enableSPI4Interrupt = false;
 
-uint32_t spi1ValuesStorage[0x100] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
-uint32_t spi2ValuesStorage[0x100] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
-uint32_t spi4ValuesStorage[0x100] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
+uint32_t spi1ValuesStorage[SDRAM_ADD_INCREMENT] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
+uint32_t spi2ValuesStorage[SDRAM_ADD_INCREMENT] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
+uint32_t spi4ValuesStorage[SDRAM_ADD_INCREMENT] __attribute__((section(".sdram"))) __attribute__((aligned(4)));
 
 typedef enum {
     red = 0,
@@ -154,6 +154,7 @@ uint16_t sps = 5;
 bool floating_point_values = false, saving_to_sd_card = false;
 float gain_x = 0.0f, gain_y = 0.0f, gain_z = 0.0f;
 int offset_x = 0, offset_y = 0, offset_z = 0;
+bool sending_over_uart = true;
 
 /* USER CODE END PV */
 
@@ -175,6 +176,7 @@ static void MX_TIM16_Init(void);
 uint32_t findMin(uint32_t a, uint32_t b, uint32_t c);
 void setColorLED(colorLED color);
 void initialSetupADC(void);
+void print_help_uart(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -284,10 +286,14 @@ int main(void)
       if(spiCommonBufferCounter < findMin(spi1ValuesBufferCounter,spi2ValuesBufferCounter,spi4ValuesBufferCounter)){
         if (floating_point_values == true){
           getStringFromValuesFloat(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues, range_x_value, range_y_value, range_z_value);
-          HAL_UART_Transmit(&huart4, stringBufferValues, 30,100);
+          if (sending_over_uart ==  true){
+            HAL_UART_Transmit(&huart4, stringBufferValues, 33,100);
+          }
         }else{
           getStringFromValues(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues);
-          HAL_UART_Transmit(&huart4, stringBufferValues, 33,100);
+          if (sending_over_uart == true){
+            HAL_UART_Transmit(&huart4, stringBufferValues, 33,100);
+          }
         }
 
         if((sdCardWriteEnable == true) && (sdCardInitError == false) && (sdCardOpenFileError == false)){
@@ -328,8 +334,27 @@ int main(void)
             break;
 
           case 'p':
-            floating_point_values = !floating_point_values;
+            floating_point_values = true;
             break;
+
+          case 'r':
+            floating_point_values = false;
+            break;
+
+          case 's':
+            sending_over_uart = true;
+            break;
+
+          case 't':
+            sending_over_uart = false;
+            break;
+
+          case 'h':
+          case '?':
+            sending_over_uart = false;
+            print_help_uart();
+            break;
+
 
          // Numbers reserved for SPS values
           case '0':
@@ -1237,6 +1262,29 @@ void initialSetupADC(void){
   spi2_adc_init(spsHex);
   spi4_adc_init(spsHex);
 
+
+}
+
+void print_help_uart(void){
+  char message[] = "Napoveda pro ovladani modulu:\r\n"
+                   "a - rozsah +-10V pro kanal X\r\n"
+                   "b - rozsah +-0.5V pro kanal X\r\n"
+                   "c - rozsah +-10V pro kanal Y\r\n"
+                   "d - rozsah +-0.5V pro kanal Y\r\n"
+                   "e - rozsah +-10V pro kanal Z\r\n"
+                   "f - rozsah +-0.5V pro kanal Z\r\n"
+                   "p - zapnuti vypisovani desetinnych cisel\r\n"
+                   "r - zapnuti vypisovani 32bit cisel\r\n"
+                   "s - zapnuti odesilani dat\r\n"
+                   "s - vypnuti odesilani dat\r\n"
+                   "h,? - napoveda\r\n"
+                   "0 - nastaveni SPS na 5\r\n"
+                   "1 - nastaveni SPS na 20\r\n"
+                   "2 - nastaveni SPS na 100\r\n"
+                   "3 - nastaveni SPS na 500\r\n"
+                   "4 - nastaveni SPS na 1000\r\n";
+
+  HAL_UART_Transmit(&huart4, message, strlen(message),100);
 
 }
 /* USER CODE END 4 */
