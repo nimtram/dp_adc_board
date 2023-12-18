@@ -69,6 +69,7 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim16;
 
 UART_HandleTypeDef huart4;
+UART_HandleTypeDef huart5;
 DMA_HandleTypeDef hdma_uart4_tx;
 
 SDRAM_HandleTypeDef hsdram1;
@@ -172,6 +173,7 @@ static void MX_DMA_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_SDMMC1_SD_Init(void);
 static void MX_TIM16_Init(void);
+static void MX_UART5_Init(void);
 /* USER CODE BEGIN PFP */
 uint32_t findMin(uint32_t a, uint32_t b, uint32_t c);
 void setColorLED(colorLED color);
@@ -225,6 +227,7 @@ int main(void)
   MX_SDMMC1_SD_Init();
   MX_FATFS_Init();
   MX_TIM16_Init();
+  MX_UART5_Init();
   /* USER CODE BEGIN 2 */
 
   // setting up timer for time measuring
@@ -247,7 +250,7 @@ int main(void)
 
   // uart4 and uart5 IT enable
   HAL_UART_Receive_IT (&huart4, rxUart4Buffer, 1);
-//  HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
+  HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
 
   // LED timer enable
   HAL_TIM_Base_Start_IT(&htim16);
@@ -288,11 +291,13 @@ int main(void)
           getStringFromValuesFloat(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues, range_x_value, range_y_value, range_z_value);
           if (sending_over_uart ==  true){
             HAL_UART_Transmit(&huart4, stringBufferValues, 33,100);
+            HAL_UART_Transmit(&huart5, stringBufferValues, 33,100);
           }
         }else{
           getStringFromValues(spi1ValuesStorage[spiCommonBufferCounter],spi2ValuesStorage[spiCommonBufferCounter],spi4ValuesStorage[spiCommonBufferCounter],stringBufferValues);
           if (sending_over_uart == true){
             HAL_UART_Transmit(&huart4, stringBufferValues, 33,100);
+            HAL_UART_Transmit(&huart5, stringBufferValues, 33,100);
           }
         }
 
@@ -875,6 +880,54 @@ static void MX_UART4_Init(void)
 }
 
 /**
+  * @brief UART5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART5_Init(void)
+{
+
+  /* USER CODE BEGIN UART5_Init 0 */
+
+  /* USER CODE END UART5_Init 0 */
+
+  /* USER CODE BEGIN UART5_Init 1 */
+
+  /* USER CODE END UART5_Init 1 */
+  huart5.Instance = UART5;
+  huart5.Init.BaudRate = 3000000;
+  huart5.Init.WordLength = UART_WORDLENGTH_8B;
+  huart5.Init.StopBits = UART_STOPBITS_1;
+  huart5.Init.Parity = UART_PARITY_NONE;
+  huart5.Init.Mode = UART_MODE_TX_RX;
+  huart5.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart5.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart5.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart5.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart5.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart5, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart5, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART5_Init 2 */
+
+  /* USER CODE END UART5_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -1119,11 +1172,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     uartNewCommand = true;
 
   }
-//  else if (huart == &huart5){
-//      HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
-//      uartCommand = rxUart5Buffer[0];
-//      uartNewCommand = true;
-//  }
+  else if (huart == &huart5){
+      HAL_UART_Receive_IT (&huart5, rxUart5Buffer, 1);
+      uartCommand = rxUart5Buffer[0];
+      uartNewCommand = true;
+  }
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
@@ -1285,6 +1338,7 @@ void print_help_uart(void){
                    "4 - nastaveni SPS na 1000\r\n";
 
   HAL_UART_Transmit(&huart4, message, strlen(message),100);
+  HAL_UART_Transmit(&huart5, message, strlen(message),100);
 
 }
 /* USER CODE END 4 */
